@@ -1,0 +1,92 @@
+version: "3.7"
+services:
+  # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html
+  es:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.3.1
+    container_name: elasticsearch
+    ports:
+      - 9200:9200
+      - 9300:9300
+    environment:
+      - discovery.type=single-node
+      - node.name=elasticsearch
+      - cluster.name=heatmap
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xmx4096m -Xms1024m"
+      - http.cors.enabled=true
+      - http.cors.allow-origin=*
+    ulimits:
+      nproc: 65535
+      memlock:
+        soft: -1
+        hard: -1
+    cap_add:
+      - ALL
+    networks:
+      - elastic
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    deploy:
+      replicas: 0
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 10s
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: "2048M"
+
+  # https://www.elastic.co/guide/en/kibana/current/docker.html
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.3.1
+    container_name: kibana
+    ports:
+      - 5601:5601
+    networks:
+      - elastic
+    volumes:
+      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml
+    depends_on:
+      - es
+    ulimits:
+      nproc: 65535
+      memlock:
+        soft: -1
+        hard: -1
+    cap_add:
+      - ALL
+    deploy:
+      replicas: 0
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: "1024M"
+
+  # https://www.elastic.co/guide/en/logstash/current/docker.html
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.3.1
+    container_name: logstash
+    environment:
+    # expecting large memory consumption, but not sure if 8GBs are necessary
+      - "LS_JAVA_OPTS=-Xmx8192m -Xms1024m"
+    ports:
+      - 9600:9600
+    networks:
+      - elastic
+    volumes:
+      - ./logstash/config/:/usr/share/logstash/config/
+      - ./logstash/pipeline_config/:/usr/share/logstash/etc/conf.d/logstash/
+    deploy:
+      replicas: 0
+      restart_policy:
+        condition: on-failure
+
+networks:
+  elastic:
+
+volumes:
+  es-data:
